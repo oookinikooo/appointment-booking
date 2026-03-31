@@ -1,8 +1,7 @@
 from aiogram import Dispatcher
 
-from .moderator import base as moderator
-from .user import base as user
+from . import moderator, user
 
 
-def attach(dp: Dispatcher):
+def attach_handlers(dp: Dispatcher):
     dp.include_routers(moderator.router(), user.router())

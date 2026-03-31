@@ -5,7 +5,7 @@ from datetime import date, datetime
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup
 from src.services.booking import Session
-from src.utils.tools import MONTHS_DEC, WEEKDAYS, MONTHS
+from src.utils.tools import month_alias_dec, month_alias, weekday_alias
 
 
 class Keyboard:
@@ -14,7 +14,14 @@ class Keyboard:
     def menu(appointment_count: int, free_slots: dict[date, int]):
         months = []
         for d in sorted(free_slots):
-            months.append([Button(text=f'{MONTHS[d.month -1]} ({free_slots[d]})', callback_data=f'{d}~explore_month')])
+            months.append(
+                [
+                    Button(
+                        text=f"{month_alias(d.month)} ({free_slots[d]})",
+                        callback_data=f"{d}~explore_month",
+                    )
+                ]
+            )
 
         return InlineKeyboardMarkup(inline_keyboard=[
             [Button(text=f'Мои записи ({appointment_count})', callback_data='~my_appointment')],
@@ -25,8 +32,14 @@ class Keyboard:
     def appointments(appointments: list[Session]):
         rows = []
         for a in sorted(appointments, key=lambda x: (x.date, x.time)):
-            text = f"{a.date.day} {MONTHS_DEC[a.date.month -1]} {a.time.hour}:00"
-            rows.append([Button(text=text, callback_data=f'{a.id}~delete_my_appointment')])
+            rows.append(
+                [
+                    Button(
+                        text=f"{a.date.day} {month_alias_dec(a.date.month)} {a.time.hour}:00",
+                        callback_data=f"{a.id}~delete_my_appointment",
+                    )
+                ]
+            )
 
         return InlineKeyboardMarkup(inline_keyboard=[
             *rows,
@@ -71,9 +84,10 @@ class Keyboard:
             rows.append(row)
 
         week_alias = []
-        for i, week_day in enumerate(WEEKDAYS):
-            if today_month and i == now.weekday():
-                week_day = f"[{week_day}]"
+        for number in range(0, 7):
+            week_day = f"{weekday_alias(number)}"
+            if today_month and number == now.weekday():
+                week_day = f"[{weekday_alias(number)}]"
 
             week_alias.append(Button(text=week_day, callback_data="~empty"))
 

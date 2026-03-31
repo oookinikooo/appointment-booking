@@ -1,18 +1,26 @@
-import calendar
+from datetime import date
 
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from src.services.booking import Booking, User
-from datetime import date
+from src.utils.tools import set_user_commands
 
 from .deps import Keyboard as K
 
+commands_was_activated = []
+
 
 async def cmd_start(message: Message):
-    user_id = message.from_user.id
-    appointments = await Booking.user_appointments(user_id)
+    global commands_was_activated
 
+    user_id = message.from_user.id
+    if user_id not in commands_was_activated:
+        is_ok = await set_user_commands(message.bot, user_id)
+        if is_ok:
+            commands_was_activated.append(user_id)
+
+    appointments = await Booking.user_appointments(user_id)
     free_slots: dict[date, int] = await Booking.get_month_slots_count()
     await message.answer(
         "Привет! Здесь можно записаться на массаж к Ксюше",
@@ -121,8 +129,10 @@ async def cb_delete_my_appointment(cb: CallbackQuery):
 
 def router():
     router = Router()
-    router.message.register(cmd_start, Command('start'))
-    for cb_func, cb_filter in (
+
+    router.message.register(cmd_start, Command('run'))
+
+    for handler, filter in (
         (cb_menu, F.data.endswith('~user_menu')),
         (cb_empty, F.data.endswith('~empty')),
         (cb_my_appointments, F.data.endswith('~my_appointment')),
@@ -131,5 +141,6 @@ def router():
         (cb_make_appointment, F.data.endswith('~make_appointment')),
         (cb_delete_my_appointment, F.data.endswith('~delete_my_appointment')),
     ):
-        router.callback_query.register(cb_func, cb_filter)
+        router.callback_query.register(handler, filter)
+
     return router

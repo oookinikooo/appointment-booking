@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime
 
 import aiosqlite
 
@@ -8,7 +8,11 @@ from .schemas import Session, SessionAdd, User
 
 class Service:
 
-    def __init__(self, db_path: str = "database.sqlite3", tablename: str = "booking"):
+    def __init__(
+        self,
+        db_path: str = "database.sqlite3",
+        tablename: str = "booking",
+    ):
         self.db_path = db_path
         self._tablename = tablename
         self._hide_tablename = "deactivated"
@@ -17,7 +21,6 @@ class Service:
     async def _session_maker(self):
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
-            # await db.execute("PRAGMA foreign_keys = ON")
             yield db
 
     async def init_db(self):
@@ -38,7 +41,7 @@ class Service:
                     is_active BOOLEAN DEFAULT true,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
+                """
             )
             await db.commit()
 
@@ -139,10 +142,7 @@ class Service:
     async def make_appointment(self, session_id: int, user: User):
         resp = await self.update(
             session_id,
-            {
-                "user_id": user.id,
-                "fullname": user.fullname,
-            },
+            {"user_id": user.id, "fullname": user.fullname},
         )
         return bool(resp)
 
@@ -159,14 +159,18 @@ class Service:
                 return [Session(**dict(r)) for r in rows]
 
     async def get_month_slots_count(self):
+        now = datetime.now()
         query = (
-            f"SELECT "
-            "strftime('%Y-%m', date) as month, "
-            "COUNT(*) as total_slots "
-            f"FROM {self._tablename} "
-            'WHERE user_id IS NULL AND time NOT LIKE "00:%" '
-            "GROUP BY strftime('%Y-%m', date) "
-            "ORDER BY month;"
+            f"""
+                SELECT
+                    strftime('%Y-%m', date) as month,
+                    COUNT(*) as total_slots
+                FROM {self._tablename}
+                WHERE
+                    user_id IS NULL AND time > "{now.hour}:%"
+                GROUP BY strftime('%Y-%m', date)
+                ORDER BY month;
+            """
         )
         async with self._session_maker() as db:
             async with db.execute(query) as cursor:

@@ -8,15 +8,25 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from src.config import config
 from src.services.booking import Booking, Session, SessionAdd
-from src.utils.tools import MONTHS, WEEKDAYS
+from src.utils.filters import ModeratorFilter
+from src.utils.tools import month_alias, set_moderator_commands, weekday_alias
 
 from .desp import Keyboard as K
 from .desp import Message as M
 
 logger = logging.getLogger(__name__)
+commands_was_activated = []
 
 
 async def cmd_start(message: Message):
+    global commands_was_activated
+
+    user_id = message.from_user.id
+    if user_id not in commands_was_activated:
+        is_ok = await set_moderator_commands(message.bot, user_id)
+        if is_ok:
+            commands_was_activated.append(user_id)
+
     await message.answer(M.menu(), reply_markup=K.menu())
 
 
@@ -34,7 +44,7 @@ async def cb_edit_or_add_months(cb: CallbackQuery):
     await cb.message.edit_text(
         "Для добавления месяца кликните на кнопку 'Добавить новый месяц'\n"
         "Для внесения правок в расписание кликните на название месяца",
-        reply_markup=K.edit_or_add_months(exists)
+        reply_markup=K.edit_or_add_months(exists),
     )
 
 
@@ -54,7 +64,7 @@ async def cb_add_new_month(cb: CallbackQuery):
     rows = await Booking.get_month_by_date(date)
 
     await cb.message.edit_text(
-        'Вы добавили новый месяц, проваливайтесь в конкретные дни для правки рабочих часов',
+        "Вы добавили новый месяц, проваливайтесь в конкретные дни для правки рабочих часов",
         reply_markup=K.edit_month(date, rows),
     )
 
@@ -62,13 +72,13 @@ async def cb_add_new_month(cb: CallbackQuery):
 async def cb_edit_month(cb: CallbackQuery):
     await cb.answer()
 
-    date_str, *_ = cb.data.split('~')
+    date_str, *_ = cb.data.split("~")
     parsed_date = date.fromisoformat(date_str)
 
     rows = await Booking.get_month_by_date(parsed_date)
 
     await cb.message.edit_text(
-        'Проваливайтесь в даты и правьте рабочие часы\n'
+        "Проваливайтесь в даты и правьте рабочие часы\n"
         "Неактивные дни помечены синим цветом",
         reply_markup=K.edit_month(parsed_date, rows),
     )
@@ -77,7 +87,7 @@ async def cb_edit_month(cb: CallbackQuery):
 async def cb_edit_day(cb: CallbackQuery):
     await cb.answer()
 
-    date_str, *_ = cb.data.split('~')
+    date_str, *_ = cb.data.split("~")
     d = date.fromisoformat(date_str)
 
     rows = await Booking.get_by_day(d)
@@ -88,17 +98,17 @@ async def cb_edit_day(cb: CallbackQuery):
         "о том, что сеанс отменен;"
         " * Зеленый цвет показывает, что сеанс активирован</i>",
         reply_markup=K.edit_day(d, rows),
-        parse_mode='HTML'
+        parse_mode="HTML",
     )
 
 
 async def cb_edit_times(cb: CallbackQuery):
     await cb.answer()
 
-    date_str, hour, row_id, *_ = cb.data.split('~')
+    date_str, hour, row_id, *_ = cb.data.split("~")
     d = date.fromisoformat(date_str)
 
-    row_id = int(row_id) if row_id and row_id != '0' else None
+    row_id = int(row_id) if row_id and row_id != "0" else None
     if row_id:
         session = await Booking.get(row_id)
         if session and session.user.id:
@@ -109,10 +119,12 @@ async def cb_edit_times(cb: CallbackQuery):
             )
         is_ok = await Booking.delete(row_id)
     else:
-        await Booking.add(SessionAdd(
-            date=d,
-            time=time(int(hour)),
-        ))
+        await Booking.add(
+            SessionAdd(
+                date=d,
+                time=time(int(hour)),
+            )
+        )
 
     rows = await Booking.get_by_day(d)
     await cb.message.edit_text(
@@ -122,7 +134,7 @@ async def cb_edit_times(cb: CallbackQuery):
         "о том, что сеанс отменен;"
         " * Зеленый цвет показывает, что сеанс активирован</i>",
         reply_markup=K.edit_day(d, rows),
-        parse_mode='HTML'
+        parse_mode="HTML",
     )
 
 
@@ -136,7 +148,7 @@ async def cb_month_by_weeks(cb: CallbackQuery):
 
     await cb.answer()
 
-    month_page, inner_page, *_ = cb.data.split('~')
+    month_page, inner_page, *_ = cb.data.split("~")
     month_page = int(month_page) if month_page else 0
     inner_page = int(inner_page) if inner_page else 0
 
@@ -158,7 +170,7 @@ async def cb_month_by_weeks(cb: CallbackQuery):
     rows = await Booking.get_month_by_date(picked_date)
 
     week_days = month_by_week[inner_page]
-    text = f"Расписание на <b>{MONTHS[picked_date.month-1]}</b> с {min(w for w in week_days if w)} по {max(week_days)}"
+    text = f"Расписание на <b>{month_alias(picked_date.month)}</b> с {min(w for w in week_days if w)} по {max(week_days)}"
     current_week = defaultdict(list[Session])
     for r in rows:
         if r.date.day in week_days:
@@ -168,27 +180,31 @@ async def cb_month_by_weeks(cb: CallbackQuery):
     if current_week:
         for r in sorted(current_week):
             day_hours = current_week[r]
-            text += f"\n<b>{WEEKDAYS[r]}</b>"
+            text += f"\n<b>{weekday_alias(r)}</b>"
             for s in sorted(day_hours, key=lambda x: x.time):
                 if s.user.id:
-                    user_link = f'<a href="tg://user?id={s.user.id}">{s.user.fullname}</a>'
+                    user_link = (
+                        f'<a href="tg://user?id={s.user.id}">{s.user.fullname}</a>'
+                    )
                 else:
-                    user_link = 'Пусто'
+                    user_link = "Пусто"
                 text += f"\n - {s.time.hour}:00 - {user_link}"
     else:
         text += "\n\nДаты приема отсутствуют"
 
     await cb.message.edit_text(
         text,
-        reply_markup=K.slider(month_page, len(exists_month), inner_page, len(month_by_week)),
-        parse_mode='HTML',
+        reply_markup=K.slider(
+            month_page, len(exists_month), inner_page, len(month_by_week)
+        ),
+        parse_mode="HTML",
     )
 
 
 async def cb_reset_all(cb: CallbackQuery):
     await cb.answer()
 
-    flag, *_ = cb.data.split('~')
+    flag, *_ = cb.data.split("~")
     if not flag:
         await cb.message.edit_text(
             "⚠️ Данное действие необратимо. Уверена?",
@@ -204,7 +220,7 @@ async def cb_reset_all(cb: CallbackQuery):
             logger.exception(f"Hide db table failed. Attempt {i}")
         else:
             is_ok = True
-            logger.info('Hide table success')
+            logger.info("Hide table success")
             break
     else:
         for i in (1, 2, 3):
@@ -218,9 +234,9 @@ async def cb_reset_all(cb: CallbackQuery):
                 break
 
     if is_ok:
-        text = 'Game over'
+        text = "Game over"
     else:
-        text = 'База все еще активна, обратитесь к администратору'
+        text = "База все еще активна, обратитесь к администратору"
     await cb.message.edit_text(text)
 
 
@@ -240,36 +256,37 @@ async def cmd_restart(message: Message):
                 logger.exception(f"Unhide db table failed. Attempt {i}")
             else:
                 unhide_ok = True
-                logger.info('Unhide table success')
+                logger.info("Unhide table success")
                 break
 
         if unhide_ok:
-            text = 'Жми /start'
+            text = "Жми /start"
         else:
-            text = 'Ошибка разблокировки таблицы, обратитесь к администратору'
+            text = "Ошибка разблокировки таблицы, обратитесь к администратору"
 
         await message.answer(text)
 
 
 def router():
     router = Router()
-    router.message.register(cmd_start, Command('start'), F.from_user.id.in_(config.admin_ids))
-    router.message.register(cmd_restart, Command('restart'), F.from_user.id.in_(config.admin_ids))
+
+    for handler, filter in (
+        (cmd_start, Command('start')),
+        (cmd_restart, Command("restart")),
+    ):
+        router.message.register(handler, filter, ModeratorFilter())
+
     for handler, filter in (
         (cb_menu, F.data.endswith("~menu")),
-
         (cb_edit_or_add_months, F.data.endswith("~edit_schedule")),
-
         (cb_add_new_month, F.data.endswith("~add_new_month")),
         (cb_edit_month, F.data.endswith("~edit_month")),
-
         (cb_edit_day, F.data.endswith("~edit_day")),
         (cb_edit_times, F.data.endswith("~edit_time")),
-
         (cb_month_by_weeks, F.data.endswith("~my_schedule")),
-
         (cb_reset_all, F.data.endswith("~reset_all")),
         (cb_empty, F.data.endswith("~empty")),
     ):
-        router.callback_query.register(handler, filter, F.from_user.id.in_(config.admin_ids))
+        router.callback_query.register(handler, filter, ModeratorFilter())
+
     return router

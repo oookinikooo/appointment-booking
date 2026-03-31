@@ -5,7 +5,7 @@ from datetime import date, datetime
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup
 from src.services.booking import Session
-from src.utils.tools import MONTHS, WEEKDAYS
+from src.utils.tools import month_alias, weekday_alias
 
 
 class Message:
@@ -32,7 +32,7 @@ class Keyboard:
         rows = []
         row = []
         for d in dates:
-            row.append(Button(text=MONTHS[d.month - 1], callback_data=f'{d}~edit_month'))
+            row.append(Button(text=month_alias(d.month), callback_data=f'{d}~edit_month'))
             if len(row) >= 2:
                 rows.append(row)
                 row = []
@@ -59,9 +59,8 @@ class Keyboard:
             if r.time.hour != 0:
                 by_day[r.date.day] += 1
 
-        month_by_week = calendar.monthcalendar(current_date.year, current_date.month)
         rows = []
-        for week in month_by_week:
+        for week in calendar.monthcalendar(current_date.year, current_date.month):
             row = []
             for day in week:
                 if day == 0:
@@ -84,7 +83,8 @@ class Keyboard:
             rows.append(row)
 
         week_alias = []
-        for i, week_day in enumerate(WEEKDAYS):
+        for i in range(0, 7):
+            week_day = weekday_alias(i)
             if today_month and i == now.weekday():
                 week_day = f"[{week_day}]"
 
@@ -128,7 +128,13 @@ class Keyboard:
             if has_recoreds[hour]:
                 text += " 👩🏼"
 
-            row.append(Button(text=text, style=style, callback_data=f"{current_date}~{hour}~{ids[hour]}~edit_time"))
+            row.append(
+                Button(
+                    text=text,
+                    style=style,
+                    callback_data=f"{current_date}~{hour}~{ids[hour]}~edit_time",
+                )
+            )
 
             if len(row) == 4:
                 rows.append(row)
@@ -142,24 +148,38 @@ class Keyboard:
         ])
 
     @staticmethod
-    def slider(month_page: int, month_page_count: int, inner_page: int, inner_page_count: int):
+    def slider(
+        month_page: int,
+        total_month_page: int,
+        inner_page: int,
+        total_inner_page: int,
+    ):
         slider = []
         if inner_page > 0:
-            slider.append(Button(text="«", callback_data=f"{month_page}~{inner_page-1}~my_schedule"))
-        if inner_page + 1 < inner_page_count:
-            slider.append(Button(text="»", callback_data=f"{month_page}~{inner_page+1}~my_schedule"))
+            slider.append(
+                Button(
+                    text="«", callback_data=f"{month_page}~{inner_page-1}~my_schedule"
+                )
+            )
+        if inner_page + 1 < total_inner_page:
+            slider.append(
+                Button(
+                    text="»", callback_data=f"{month_page}~{inner_page+1}~my_schedule"
+                )
+            )
 
         month_slider = []
         if month_page > 0:
-            month_slider.append(Button(text="«", callback_data=f"{month_page - 1}~0~my_schedule"))
+            month_slider.append(
+                Button(text="«", callback_data=f"{month_page - 1}~0~my_schedule")
+            )
         month_slider.append(Button(text="Назад", callback_data="~menu"))
-        if month_page + 1 < month_page_count:
-            month_slider.append(Button(text="»", callback_data=f"{month_page + 1}~0~my_schedule"))
+        if month_page + 1 < total_month_page:
+            month_slider.append(
+                Button(text="»", callback_data=f"{month_page + 1}~0~my_schedule")
+            )
 
-        return InlineKeyboardMarkup(inline_keyboard=[
-            slider,
-            month_slider
-        ])
+        return InlineKeyboardMarkup(inline_keyboard=[slider, month_slider])
 
     @staticmethod
     def reset_db():
