@@ -16,14 +16,12 @@ logger = logging.getLogger(__name__)
 
 async def main():
     await Booking.init_db()
-    r = await Booking.get_active_month()
-    print(r)
-    return
+
     bot = Bot(token=config.token)
 
-    # @aiocron.crontab("0 */1 * * *")
-    # async def job_1_remove_old_rows():
-    #     await Booking.get()
+    @aiocron.crontab("0 */1 * * *")
+    async def job_1_remove_old_rows():
+        pass
 
     dp = Dispatcher()
 
