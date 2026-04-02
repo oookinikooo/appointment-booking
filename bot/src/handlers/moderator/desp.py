@@ -20,8 +20,9 @@ class Message:
     @staticmethod
     def edit_time(date: date):
         return (
-            f"Изменение рабочего времени <b>{date.day} "
-            f"{month_alias_dec(date.month)} {weekday_alias(date.weekday())}</b>\n\n"
+            f"<b>{date.day} {month_alias_dec(date.month).lower()} "
+            f"{weekday_alias(date.weekday()).lower()}</b> "
+            "изменение рабочего времени\n\n"
             "Нажми на время - оно станет рабочим и будет подсвечено зеленым\n\n"
             "Стоит пометка 👩🏼 - есть запись, если нажать на время с пометкой, "
             "запись будет отменена, а клиенту придет оповещение об отмене"

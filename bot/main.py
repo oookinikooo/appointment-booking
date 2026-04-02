@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime
 
 import aiocron
 from aiogram import Bot, Dispatcher
@@ -22,9 +23,25 @@ async def main():
     bot = Bot(token=config.token,
               default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
-    @aiocron.crontab("0 */1 * * *")
-    async def job_1_remove_past_rows():
-        pass
+    @aiocron.crontab("5 0 * * *")
+    async def job_1_remove_expired_sessions():
+        now = datetime.now()
+        sessions = await Booking.get_expired_sessions()
+        expired = []
+        for s in sessions:
+            if s.time.hour == 0 and s.date.month >= now.month:
+                continue
+            if s.date == now.date() and s.time > now.time():
+                continue
+            expired.append(s)
+
+        if expired:
+            log_msg = f"Found {len(expired)} expired sessions:\n"
+            for s in expired:
+                is_ok = await Booking.delete(s.id)
+                log_msg += f"\n * Del {s.date:%d.%m.%y} at {s.time:%H:%M:%S} " \
+                           f"{'success' if is_ok else 'failed'}"
+            logger.info(log_msg)
 
     dp = Dispatcher()
     dp.startup.register(startup)

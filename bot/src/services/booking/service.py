@@ -38,7 +38,6 @@ class Service:
                     time TIME NOT NULL,
                     user_id INTEGER,
                     fullname TEXT,
-                    is_active BOOLEAN DEFAULT true,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """
@@ -80,7 +79,7 @@ class Service:
                 await db.commit()
                 return cursor.rowcount
 
-    async def delete(self, id: int) -> int:
+    async def delete(self, id: int) -> bool:
         async with self._session_maker() as db:
             cursor = await db.execute(
                 f"DELETE FROM {self._tablename} WHERE id = ?", (id,)
@@ -151,30 +150,31 @@ class Service:
         return bool(resp)
 
     async def user_appointments(self, user_id: int):
-        now = datetime.now()
+        query = f'''
+            SELECT * FROM {self._tablename}
+            WHERE
+                user_id = ?
+                AND datetime(date || ' ' || time) >= datetime('now', 'localtime')
+            ORDER BY datetime(date || ' ' || time);
+        '''
         async with self._session_maker() as db:
-            async with db.execute(
-                f"SELECT * FROM {self._tablename} "
-                f'WHERE user_id = ? AND date >= "{now.date()}" AND time >= "{now.hour}:%"',
-                (user_id,),
-            ) as cursor:
+            async with db.execute(query, (user_id,)) as cursor:
                 rows = await cursor.fetchall()
                 return [Session(**dict(r)) for r in rows]
 
     async def get_month_slots_count(self):
-        now = datetime.now()
-        query = (
-            f"""
-                SELECT
-                    strftime('%Y-%m', date) as month,
-                    COUNT(*) as total_slots
-                FROM {self._tablename}
-                WHERE
-                    user_id IS NULL AND date >= "{now.date()}" AND time > "{now.time().replace(microsecond=0)}"
-                GROUP BY strftime('%Y-%m', date)
-                ORDER BY month;
-            """
-        )
+        query = f'''
+            SELECT
+                strftime('%Y-%m', date) as month,
+                COUNT(*) as total_slots
+            FROM {self._tablename}
+            WHERE
+                user_id IS NULL
+                AND time <> '00:00:00'
+                AND datetime(date || ' ' || time) >= datetime('now', 'localtime')
+            GROUP BY strftime('%Y-%m', date)
+            ORDER BY month;
+        '''
         async with self._session_maker() as db:
             async with db.execute(query) as cursor:
                 rows = await cursor.fetchall()
@@ -207,11 +207,13 @@ class Service:
     async def unhide(self):
         return await self._change_table(self._hide_tablename, self._tablename)
 
-    async def get_all_before_timestamp(self, timestamp: datetime):
+    async def get_expired_sessions(self):
+        query =  f'''
+            SELECT * FROM {self._tablename}
+            WHERE
+                datetime(date || ' ' || time) < datetime('now', 'localtime')
+        '''
         async with self._session_maker() as db:
-            async with db.execute(
-                f"SELECT * FROM {self._tablename} WHERE date <= ? and time < ?",
-                (str(timestamp.date()), str(timestamp.time())),
-            ) as cursor:
+            async with db.execute(query) as cursor:
                 rows = await cursor.fetchall()
                 return [Session(**dict(r)) for r in rows]

@@ -134,7 +134,7 @@ class Keyboard:
     @staticmethod
     def appointments(sessions: list[Session]):
         rows = []
-        for s in sorted(sessions, key=lambda x: (x.date, x.time)):
+        for s in sessions:
             text = f"{s.date.day} {month_alias_dec(s.date.month)} " \
                    f"{weekday_alias(s.date.weekday())} {s.time.hour}:00"
             rows.append(

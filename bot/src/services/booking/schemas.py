@@ -20,7 +20,6 @@ class Session(SessionAdd):
     model_config = ConfigDict(from_attributes=True, extra="ignore")
 
     id: int
-    is_active: bool
     created_at: datetime
 
     @model_validator(mode='before')
