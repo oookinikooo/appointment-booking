@@ -95,16 +95,18 @@ async def notify_admin(
     return True
 
 
-async def notify_user(bot: Bot, session: Session) -> bool:
-    if not session.user.id:
+async def notify_user(bot: Bot, user_id: int, sessions: list[Session]) -> bool:
+    if not sessions or not sessions[0].user.id:
         return False
 
+    hours = sorted([s.time.hour for s in sessions])
+    hours_list = ', '.join([f'{h}:00' for h in hours])
     for i in (1, 2, 3):
         try:
             await bot.send_message(
-                session.user.id,
+                user_id,
                 "Доброе утро!\n"
-                f"Напоминаю, сегодня в {session.time.hour}:00 вы записаны на массаж"
+                f"Напоминаю, сегодня в {hours_list} вы записаны на массаж"
             )
         except Exception as e:
             logger.error(f"Notify user failed. Attempt-{i}. Retry after 0.15s\n"
