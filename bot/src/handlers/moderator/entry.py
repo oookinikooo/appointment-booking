@@ -19,6 +19,9 @@ commands_was_activated = []
 
 
 async def cmd_start(message: Message):
+    if await Booking.is_hiden():
+        return
+
     global commands_was_activated
 
     user_id = message.from_user.id
@@ -190,6 +193,9 @@ async def cb_my_schedule(cb: CallbackQuery):
 
 async def cb_reset_all(cb: CallbackQuery):
     await cb.answer()
+
+    if await Booking.is_hiden():
+        return
 
     flag, *_ = cb.data.split("~")
     if not flag:

@@ -207,6 +207,12 @@ class Service:
     async def unhide(self):
         return await self._change_table(self._hide_tablename, self._tablename)
 
+    async def is_hiden(self):
+        tables = await self._select_name_of_tables()
+        if self._hide_tablename in tables:
+            return True
+        return False
+
     async def get_expired_sessions(self):
         query =  f'''
             SELECT * FROM {self._tablename}
