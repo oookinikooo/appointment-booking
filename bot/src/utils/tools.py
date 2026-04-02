@@ -50,7 +50,7 @@ async def set_user_commands(bot: Bot, user_id: int):
     return await set_commands(
         bot,
         user_id,
-        [BotCommand(command="run", description="Открыть меню")],
+        [BotCommand(command="start", description="Открыть меню")],
     )
 
 
