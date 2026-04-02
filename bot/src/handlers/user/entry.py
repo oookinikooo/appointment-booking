@@ -166,7 +166,7 @@ async def cb_delete_my_appointment(cb: CallbackQuery):
 def router():
     router = Router()
 
-    router.message.register(cmd_start, Command('run'))
+    router.message.register(cmd_start, Command('start'))
 
     for handler, filter in (
         (cb_menu, F.data.endswith("~user_menu")),

@@ -81,8 +81,8 @@ async def notify_admin(
         f"{profile_link} {session.date.day} {month_alias_dec(session.date.month)} "
         f"{weekday_alias(session.date.weekday())} на {session.time.hour}:00"
     )
-    for i in (1, 2, 3):
-        for admin_id in config.admin_ids:
+    for admin_id in config.admin_ids:
+        for i in (1, 2, 3):
             try:
                 await bot.send_message(admin_id, text, parse_mode="HTML")
             except Exception as e:
