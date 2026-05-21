@@ -9,11 +9,18 @@ from src.utils.tools import notify_admin, set_user_commands
 from .deps import Keyboard as K
 from .deps import Message as M
 
-HI_MESSAGE = (
-    "Добро пожаловать!\nС помощью бота можно записаться на массаж, "
-    "просмотреть свои записи, при необходимости отменить запись"
-)
 commands_was_activated = []
+
+
+async def get_menu_text_rpm(user_id: int):
+    text = (
+        "Добро пожаловать!\nС помощью бота можно записаться на массаж, "
+        "просмотреть свои записи, при необходимости отменить запись"
+    )
+    appointments = await Booking.user_appointments(user_id)
+    active_months: list[date] = await Booking.get_active_month()
+    free_slots: dict[date, int] = await Booking.get_month_slots_count()
+    return text, K.menu(len(appointments), active_months, free_slots)
 
 
 async def cmd_start(message: Message):
@@ -25,29 +32,24 @@ async def cmd_start(message: Message):
         if is_ok:
             commands_was_activated.append(user_id)
 
-    appointments = await Booking.user_appointments(user_id)
-    free_slots: dict[date, int] = await Booking.get_month_slots_count()
-    await message.answer(
-        HI_MESSAGE,
-        reply_markup=K.menu(len(appointments), free_slots),
-    )
+    text, rpm = await get_menu_text_rpm(user_id)
+    await message.answer(text, reply_markup=rpm)
 
 
 async def cb_menu(cb: CallbackQuery):
     await cb.answer()
 
     user_id = cb.from_user.id
-    appointments = await Booking.user_appointments(user_id)
-
-    free_slots: dict[date, int] = await Booking.get_month_slots_count()
-    await cb.message.edit_text(
-        HI_MESSAGE,
-        reply_markup=K.menu(len(appointments), free_slots),
-    )
+    text, rpm = await get_menu_text_rpm(user_id)
+    await cb.message.edit_text(text, reply_markup=rpm)
 
 
 async def cb_empty(cb: CallbackQuery):
     await cb.answer()
+
+
+async def cb_no_free_slots(cb: CallbackQuery):
+    await cb.answer("Нет мест для записи", show_alert=True)
 
 
 async def cb_explore_month(cb: CallbackQuery):
@@ -158,9 +160,7 @@ async def cb_delete_my_appointment(cb: CallbackQuery):
 
     appointments = await Booking.user_appointments(user_id)
     if not appointments:
-        free_slots: dict[date, int] = await Booking.get_month_slots_count()
-        text = HI_MESSAGE
-        rpm = K.menu(len(appointments), free_slots)
+        text, rpm = await get_menu_text_rpm(user_id)
     else:
         text = "Ваши записи\nДля удаления записи нажмите на нее"
         rpm = K.appointments(appointments)
@@ -176,6 +176,7 @@ def router():
     for handler, filter in (
         (cb_menu, F.data.endswith("~user_menu")),
         (cb_empty, F.data.endswith("~empty")),
+        (cb_no_free_slots, F.data.endswith("~no_free_slots")),
         (cb_my_appointments, F.data.endswith("~my_appointment")),
         (cb_explore_month, F.data.endswith("~explore_month")),
         (cb_explore_day, F.data.endswith("~explore_day")),
