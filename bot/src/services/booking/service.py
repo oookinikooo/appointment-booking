@@ -10,7 +10,7 @@ class Service:
 
     def __init__(
         self,
-        db_path: str = "database.sqlite3",
+        db_path: str = "massage.sqlite3",
         tablename: str = "booking",
     ):
         self.db_path = db_path
@@ -40,7 +40,7 @@ class Service:
                     fullname TEXT,
                     reservation_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
+                );
                 """
             )
             await db.commit()
@@ -239,3 +239,10 @@ class Service:
             async with db.execute(query) as cursor:
                 rows = await cursor.fetchall()
                 return [Session(**dict(r)) for r in rows]
+
+    async def get_all(self):
+        query =  f'''SELECT * FROM {self._tablename}'''
+        async with self._session_maker() as db:
+            async with db.execute(query) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(r) for r in rows]

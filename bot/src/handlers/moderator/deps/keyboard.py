@@ -5,45 +5,88 @@ from datetime import date, datetime
 from aiogram.types import InlineKeyboardButton as Button
 from aiogram.types import InlineKeyboardMarkup
 from src.services.booking import Session
-from src.utils.tools import month_alias, weekday_alias, month_alias_dec
+from src.services.user import User
+from src.utils.tools import month_alias, weekday_alias
 
 
-class Message:
-    @staticmethod
-    def menu():
-        return (
-            "<b>Расписание</b> - записи по неделям и месяцам\n\n"
-            "<b>Изменить расписание</b> - добавление нового месяца и изменение "
-            "рабочих дней / часов по каждому из месяцев\n"
+class UserKeyboard:
+    def categories(self):
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [Button(text="С доступом в бот", callback_data="0~1~users")],
+                [Button(text="Без доступа", callback_data="0~0~users")],
+                [Button(text="Назад", callback_data="~menu")],
+            ]
         )
 
-    @staticmethod
-    def edit_time(date: date):
-        return (
-            f"<b>{date.day} {month_alias_dec(date.month)} "
-            f"{weekday_alias(date.weekday())}</b> "
-            "изменение рабочего времени\n\n"
-            "Нажми на время - оно станет рабочим и будет подсвечено зеленым\n\n"
-            "Стоит пометка 👩🏼 - есть запись, если нажать на время с пометкой, "
-            "запись будет отменена, а клиенту придет оповещение об отмене"
+    def slider(self, items: list[User], page: int, total_page: int):
+        rows = []
+        flag = 0
+        for i in items:
+            flag = i.is_active
+            rows.append(
+                [Button(text=i.fullname, callback_data=f"{i.id}~{page}~user_info")]
+            )
+
+        slider = []
+        if page > 0:
+            slider.append(
+                Button(text="«", callback_data=f"{page - 1}~{int(flag)}~users")
+            )
+        slider.append(Button(text="Назад", callback_data="~user_categories"))
+        if page + 1 < total_page:
+            slider.append(
+                Button(text="»", callback_data=f"{page + 1}~{int(flag)}~users")
+            )
+        return InlineKeyboardMarkup(inline_keyboard=[*rows, slider])
+
+    def action(self, user: User, page: str, list_status: bool):
+        if not user.is_active:
+            row = [
+                Button(
+                    text="Добавить в базу клиентов",
+                    callback_data=f"{user.id}~{page}~{int(list_status)}~change_status",
+                )
+            ]
+        else:
+            row = [
+                Button(
+                    text="Убрать из базы клиентов",
+                    callback_data=f"{user.id}~{page}~{int(list_status)}~change_status",
+                )
+            ]
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                row,
+                [
+                    Button(
+                        text="Назад", callback_data=f"{page}~{int(list_status)}~users"
+                    )
+                ],
+            ]
         )
 
-    @staticmethod
-    def session_rejected(session: Session):
-        return (
-            "❗️ Внимание!\n"
-            f"Сеанс {session.date:%d.%m.%Y} {session.time:%H:%M} был отменен модератором"
+    def go_back(self):
+        return InlineKeyboardMarkup(
+            inline_keyboard=[[Button(text="Назад", callback_data="~user_categories")]]
         )
 
 
 class Keyboard:
+    user = UserKeyboard()
+
     @staticmethod
     def menu():
         return InlineKeyboardMarkup(
             inline_keyboard=[
                 [Button(text="Расписание", callback_data="~schedule_months")],
                 [Button(text="Изменить расписание", callback_data="~edit_schedule")],
-                [Button(text="Удалить все", style="danger", callback_data="~reset_all")],
+                [Button(text="Пользователи", callback_data="~user_categories")],
+                [
+                    Button(
+                        text="Удалить все", style="danger", callback_data="~reset_all"
+                    )
+                ],
             ]
         )
 
@@ -65,11 +108,17 @@ class Keyboard:
             if row:
                 rows.append(row)
 
-        return InlineKeyboardMarkup(inline_keyboard=[
-            *rows,
-            [Button(text="➕ Добавить новый месяц", callback_data="~add_new_month")],
-            [Button(text="Назад", callback_data="~menu")]
-        ])
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                *rows,
+                [
+                    Button(
+                        text="➕ Добавить новый месяц", callback_data="~add_new_month"
+                    )
+                ],
+                [Button(text="Назад", callback_data="~menu")],
+            ]
+        )
 
     @staticmethod
     def edit_month(current_date: date, sessions: list[Session] = []):
@@ -167,10 +216,12 @@ class Keyboard:
         else:
             if row:
                 rows.append(row)
-        return InlineKeyboardMarkup(inline_keyboard=[
-            *rows,
-            [Button(text="Назад", callback_data=f'{current_date}~edit_month')]
-        ])
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                *rows,
+                [Button(text="Назад", callback_data=f"{current_date}~edit_month")],
+            ]
+        )
 
     @staticmethod
     def schedule_months(dates: list[date]):
@@ -190,32 +241,36 @@ class Keyboard:
             if row:
                 rows.append(row)
 
-        return InlineKeyboardMarkup(inline_keyboard=[
-            *rows,
-            [Button(text="Назад", callback_data="~menu")],
-        ])
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                *rows,
+                [Button(text="Назад", callback_data="~menu")],
+            ]
+        )
 
     @staticmethod
     def week_slider(current_date: date, page: int, total_page: int):
         slider = []
         if page > 0:
             slider.append(
-                Button(
-                    text="«", callback_data=f"{current_date}~{page-1}~my_schedule"
-                )
+                Button(text="«", callback_data=f"{current_date}~{page - 1}~my_schedule")
             )
-        slider.append(Button(text='Назад', callback_data="~schedule_months"))
+        slider.append(Button(text="Назад", callback_data="~schedule_months"))
         if page + 1 < total_page:
             slider.append(
-                Button(
-                    text="»", callback_data=f"{current_date}~{page+1}~my_schedule"
-                )
+                Button(text="»", callback_data=f"{current_date}~{page + 1}~my_schedule")
             )
         return InlineKeyboardMarkup(inline_keyboard=[slider])
 
     @staticmethod
     def reset_db():
-        return InlineKeyboardMarkup(inline_keyboard=[
-            [Button(text="Да, очистить", style="danger", callback_data="1~reset_all")],
-            [Button(text="Назад", callback_data="~menu")],
-        ])
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    Button(
+                        text="Да, очистить", style="danger", callback_data="1~reset_all"
+                    )
+                ],
+                [Button(text="Назад", callback_data="~menu")],
+            ]
+        )

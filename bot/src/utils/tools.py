@@ -4,28 +4,48 @@ from datetime import datetime
 from typing import Literal
 
 from aiogram import Bot
-from aiogram.types import BotCommand, BotCommandScopeChat
+from aiogram.types import BotCommand, BotCommandScopeChat, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton as Button
 from src.config import config
-from src.services.booking import Session, User
+from src.services.booking import Session
+from src.services.user import User
 
-logger = logging.getLogger('utils.tools')
+logger = logging.getLogger("utils.tools")
 
 
 def month_alias(pos: int) -> str:
-    '''Get name of month by pos. Pos may be number between 1-12'''
+    """Get name of month by pos. Pos may be number between 1-12"""
     return (
-        "январь", "февраль", "март", "апрель",
-        "май", "июнь", "июль", "август",
-        "сентябрь", "октябрь", "ноябрь", "декабрь"
+        "январь",
+        "февраль",
+        "март",
+        "апрель",
+        "май",
+        "июнь",
+        "июль",
+        "август",
+        "сентябрь",
+        "октябрь",
+        "ноябрь",
+        "декабрь",
     )[pos - 1]
 
 
 def month_alias_dec(pos: int) -> str:
-    '''Get declansion name of month by pos. Pos may be number between 1-12'''
+    """Get declansion name of month by pos. Pos may be number between 1-12"""
     return (
-        "января", "февраля", "марта", "апреля",
-        "мая", "июня", "июля", "августа",
-        "сентября", "октября", "ноября", "декабря",
+        "января",
+        "февраля",
+        "марта",
+        "апреля",
+        "мая",
+        "июня",
+        "июля",
+        "августа",
+        "сентября",
+        "октября",
+        "ноября",
+        "декабря",
     )[pos - 1]
 
 
@@ -40,8 +60,9 @@ async def set_commands(bot: Bot, chat_id: int, commands: list[BotCommand]):
             scope=BotCommandScopeChat(chat_id=chat_id),
         )
     except Exception as e:
-        logger.error(f"Set commands for user #{chat_id} failed\n"
-                     f"{type(e).__name__}: {e}")
+        logger.error(
+            f"Set commands for user #{chat_id} failed\n{type(e).__name__}: {e}"
+        )
     else:
         return is_ok
     return False
@@ -67,10 +88,12 @@ async def set_moderator_commands(bot: Bot, user_id: int):
 
 
 async def startup(bot: Bot):
-    await bot.send_message(chat_id=config.admin_ids[0], text='Bot started')
+    await bot.send_message(chat_id=config.admin_ids[0], text="Bot started")
 
 
-async def notify_admin(bot: Bot, session: Session, action: Literal["make", "reject"]) -> bool:
+async def notify_admin(
+    bot: Bot, session: Session, action: Literal["make", "reject"]
+) -> bool:
     user = session.user
     if not user:
         logger.error(f"Notify admin about {action} session #{session.id} failed")
@@ -87,8 +110,10 @@ async def notify_admin(bot: Bot, session: Session, action: Literal["make", "reje
             try:
                 await bot.send_message(admin_id, text, parse_mode="HTML")
             except Exception as e:
-                logger.error(f"Notify failed. Attempt-{i}. Retry after 0.15s\n"
-                            f"{type(e).__name__}: {e}")
+                logger.error(
+                    f"Notify failed. Attempt-{i}. Retry after 0.15s\n"
+                    f"{type(e).__name__}: {e}"
+                )
                 await asyncio.sleep(0.15)
             else:
                 break
@@ -114,7 +139,7 @@ async def notify_user(
     when: Literal["today", "tomorrow"] = "today",
 ) -> bool:
     if hours := sorted([s.time.hour for s in sessions if s.user]):
-        hours_list = ', '.join([f'{h}:00' for h in hours])
+        hours_list = ", ".join([f"{h}:00" for h in hours])
         for i in (1, 2, 3):
             try:
                 await bot.send_message(
@@ -124,9 +149,58 @@ async def notify_user(
                     f"в {hours_list} вы записаны на массаж",
                 )
             except Exception as e:
-                logger.error(f"Notify user failed. Attempt-{i}. Retry after 0.15s\n"
-                            f"{type(e).__name__}: {e}")
+                logger.error(
+                    f"Notify user failed. Attempt-{i}. Retry after 0.15s\n"
+                    f"{type(e).__name__}: {e}"
+                )
                 await asyncio.sleep(0.15)
             else:
                 return True
     return False
+
+
+async def notify_about_adding(bot: Bot, user_id: int):
+    text = "✅ Доступ предоставлен\nНажмите комманду /start для начала работы"
+    for i in (1, 2, 3):
+        try:
+            await bot.send_message(user_id, text)
+        except Exception as e:
+            logger.error(
+                f"Notify user about adding failed. Attempt-{i}. "
+                f"Retry after 0.15s\n{type(e).__name__}: {e}"
+            )
+            await asyncio.sleep(0.15)
+        else:
+            await set_user_commands(bot, user_id)
+            return True
+    return False
+
+
+async def notify_admin_about_new_user(bot: Bot, user: User):
+    text = f"☘️ Новый пользователь #{user.id} - {user.fullname}"
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                Button(text="Добавить", callback_data=f"1~{user.id}~user_activation"),
+                Button(text="Отклонить", callback_data=f"~{user.id}~user_activation"),
+            ]
+        ]
+    )
+    for admin_id in config.admin_ids:
+        for i in (1, 2, 3):
+            try:
+                await bot.send_message(
+                    admin_id,
+                    text,
+                    reply_markup=kb,
+                    parse_mode="HTML",
+                )
+            except Exception as e:
+                logger.error(
+                    f"Notify admin about new user failed. Attempt-{i}. "
+                    f"Retry after 0.15s\n{type(e).__name__}: {e}"
+                )
+                await asyncio.sleep(0.15)
+            else:
+                break
+    return True
