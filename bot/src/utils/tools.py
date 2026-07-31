@@ -82,6 +82,7 @@ async def set_moderator_commands(bot: Bot, user_id: int):
         user_id,
         [
             BotCommand(command="start", description="Открыть меню"),
+            BotCommand(command="send", description="Отправить сообщение пользователям"),
             BotCommand(command="restart", description="Перезапуск"),
         ],
     )
